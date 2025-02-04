@@ -29,16 +29,14 @@ Avant de commencer, assurez-vous d'avoir :
 1. Allez sur le **Portail Azure** ([portal.azure.com](https://portal.azure.com))
 2. Recherchez **Groupes de ressources**
 3. Cliquez sur **Créer**
-4. Donnez un nom au groupe (`azure-test-group`)
+4. Donnez un nom au groupe (`azure_test_resource_group`)
 5. Sélectionnez une **région** (ex: `UK South`)
 6. Cliquez sur **Créer**
 
 ### ⌨️ Via Azure CLI
 
 ```powershell
-$resourceGroup = "azure-test-group"
-$location = "uksouth"
-az group create --name $resourceGroup --location $location
+az group create --name azure_test_resource_group --location uksouth
 ```
 
 ---
@@ -50,17 +48,17 @@ az group create --name $resourceGroup --location $location
 1. Allez sur **Registres de conteneurs**
 2. Cliquez sur **Créer**
 3. Remplissez :
-   - Groupe de ressources : `azure-test-group`
-   - Nom : `azuretestregistry`
+   - Groupe de ressources : `azure_test_resource_group`
+   - Nom : `azuretest2containerregistry`
    - Niveau de tarification : `Basic`
 4. Cliquez sur **Créer**
+5. Une fois créé, activez l'option **Admin utilisateur**
 
 ### ⌨️ Via Azure CLI
 
 ```powershell
-$acrName = "azuretestregistry"
-az acr create --resource-group $resourceGroup --name $acrName --sku Basic --location $location
-az acr update --name $acrName --admin-enabled true
+az acr create --resource-group azure_test_resource_group --name azuretest2containerregistry --sku Basic --location uksouth
+az acr update --name azuretest2containerregistry --admin-enabled true
 ```
 
 ---
@@ -80,21 +78,18 @@ az acr update --name $acrName --admin-enabled true
    ```
 3. **Taguer et pousser l’image vers Azure**
    ```sh
-   docker tag nginx-image azuretestregistry.azurecr.io/nginx-image
-   docker push azuretestregistry.azurecr.io/nginx-image
+   docker tag nginx-image azuretest2containerregistry.azurecr.io/nginx-image
+   docker push azuretest2containerregistry.azurecr.io/nginx-image
    ```
 
 ### ⌨️ Via Azure CLI
 
 ```powershell
-$acrLoginServer = "azuretestregistry.azurecr.io"
-$imageName = "nginx-image"
+docker login azuretest2containerregistry.azurecr.io --username $(az acr credential show --name azuretest2containerregistry --query "username" -o tsv) --password $(az acr credential show --name azuretest2containerregistry --query "passwords[0].value" -o tsv)
 
-docker login $acrLoginServer --username $(az acr credential show --name $acrName --query "username" -o tsv) --password $(az acr credential show --name $acrName --query "passwords[0].value" -o tsv)
-
-docker build -t $imageName .
-docker tag $imageName $acrLoginServer/$imageName
-docker push $acrLoginServer/$imageName
+docker build -t nginx-image .
+docker tag nginx-image azuretest2containerregistry.azurecr.io/nginx-image
+docker push azuretest2containerregistry.azurecr.io/nginx-image
 ```
 
 ---
@@ -106,9 +101,9 @@ docker push $acrLoginServer/$imageName
 1. Allez sur **Instances de conteneurs**
 2. Cliquez sur **Créer**
 3. Sélectionnez :
-   - Groupe de ressources : `azure-test-group`
-   - Nom du conteneur : `nginx-container`
-   - Image : `azuretestregistry.azurecr.io/nginx-image`
+   - Groupe de ressources : `azure_test_resource_group`
+   - Nom du conteneur : `my-container-instance`
+   - Image : `azuretest2containerregistry.azurecr.io/nginx-image`
    - CPU/Mémoire : `1 vCPU / 1.5 GiB`
    - Activer **DNS public**
    - Port 80
@@ -117,27 +112,31 @@ docker push $acrLoginServer/$imageName
 ### ⌨️ Via Azure CLI
 
 ```powershell
-$containerName = "nginx-container"
-$dnsName = "nginx-container-public"
-
-az container create --resource-group $resourceGroup --name $containerName --image $acrLoginServer/$imageName --cpu 1 --memory 1.5 --os-type Linux --restart-policy OnFailure --registry-login-server $acrLoginServer --registry-username $(az acr credential show --name $acrName --query "username" -o tsv) --registry-password $(az acr credential show --name $acrName --query "passwords[0].value" -o tsv) --dns-name-label $dnsName --ports 80
-
-$publicIP = az container show --resource-group $resourceGroup --name $containerName --query "ipAddress.ip" --output tsv
-Write-Host "IP publique du conteneur : $publicIP"
+az container create --resource-group azure_test_resource_group --name my-container-instance --image azuretest2containerregistry.azurecr.io/nginx-image --cpu 1 --memory 1.5 --os-type Linux --restart-policy OnFailure --registry-login-server azuretest2containerregistry.azurecr.io --registry-username $(az acr credential show --name azuretest2containerregistry --query "username" -o tsv) --registry-password $(az acr credential show --name azuretest2containerregistry --query "passwords[0].value" -o tsv) --dns-name-label mycontainerpublic --ports 80
 ```
 
 ---
 
 ## 5️⃣ Création du compte de stockage et du conteneur Blob
 
+### 🖥️ Via l'interface Azure
+
+1. Allez sur **Comptes de stockage**
+2. Cliquez sur **Créer**
+3. Remplissez :
+   - Groupe de ressources : `azure_test_resource_group`
+   - Nom du compte : `mystorageaccountXXXXXX` (remplacez `XXXXXX` par un nombre aléatoire)
+   - Région : `UK South`
+   - Performance : `Standard`
+   - Redondance : `Stockage localement redondant (LRS)`
+4. Cliquez sur **Créer**
+5. Une fois créé, allez dans le compte et créez un **conteneur blob** nommé `nginx-logs`
+
 ### ⌨️ Via Azure CLI
 
 ```powershell
-$storageAccountName = "storage$(Get-Random)"
-$containerNameBlob = "nginx-logs"
-
-az storage account create --name $storageAccountName --resource-group $resourceGroup --location $location --sku Standard_LRS
-az storage container create --account-name $storageAccountName --name $containerNameBlob
+az storage account create --name mystorageaccountXXXXXX --resource-group azure_test_resource_group --location uksouth --sku Standard_LRS
+az storage container create --account-name mystorageaccountXXXXXX --name nginx-logs
 ```
 
 ---
@@ -147,23 +146,11 @@ az storage container create --account-name $storageAccountName --name $container
 ### ⌨️ Script PowerShell
 
 ```powershell
-Start-Sleep -Seconds 10
+$response = curl -s "http://$publicIP"
+$nginxStatus = if ($response -match "nginx") { "nginx est actif" } else { "nginx n'est pas actif" }
+Write-Host "Statut de nginx : $nginxStatus" | Out-File -FilePath "nginx_status_log.txt" -Append
 
-$nginxStatus = curl -s "http://$publicIP" | Select-String "nginx" ? "nginx est actif" : "nginx n'est pas actif"
-Write-Host "Statut de nginx : $nginxStatus" | Out-File -FilePath ".
-ginx_status_log.txt" -Append
-
-$containerExists = az storage container exists --account-name $storageAccountName --name $containerNameBlob --query "exists" --output tsv
-
-if ($containerExists -eq "false") {
-    az storage container create --account-name $storageAccountName --name $containerNameBlob
-}
-
-Write-Host "Envoi du log vers Azure Blob Storage..."
-$storageAccountKey = az storage account keys list --resource-group $resourceGroup --account-name $storageAccountName --query "[0].value" --output tsv
-
-az storage blob upload --account-name $storageAccountName --container-name $containerNameBlob --file ".
-ginx_status_log.txt" --name "nginx_status_log.txt" --account-key $storageAccountKey
+az storage blob upload --account-name mystorageaccountXXXXXX --container-name nginx-logs --file "nginx_status_log.txt" --name "nginx_status_log.txt"
 ```
 
 ---
@@ -173,7 +160,6 @@ ginx_status_log.txt" --name "nginx_status_log.txt" --account-key $storageAccount
 ### ⌨️ Via Azure CLI
 
 ```powershell
-Write-Host "Suppression du conteneur..."
-az container delete --resource-group $resourceGroup --name $containerName --yes
-Write-Host "Conteneur supprimé avec succès."
+az container delete --resource-group azure_test_resource_group --name my-container-instance --yes
 ```
+
