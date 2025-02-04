@@ -49,7 +49,8 @@ $storageAccountExists = az storage account check-name --name $storageAccountName
 if ($storageAccountExists.nameAvailable -eq $true) {
     Write-Host "Storage account does not exist, creating..."
     az storage account create --name $storageAccountName --resource-group $resourceGroup --location $location --sku Standard_LRS
-} else {
+}
+else {
     Write-Host "Storage account already exists."
 }
 
@@ -70,7 +71,8 @@ $response = curl -s "http://$publicIP"
 
 if ($response -match "nginx") {
     $nginxStatus = "nginx is active"
-} else {
+}
+else {
     $nginxStatus = "nginx is not active"
 }
 
@@ -117,8 +119,8 @@ if ($existingTask) {
 }
 
 Write-Host "Creating scheduled task..."
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File `"$scriptPath`""
-$trigger = New-ScheduledTaskTrigger -Daily -At 02:00AM  # Executes daily at 2:00AM
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date)  
+$trigger.Repetition = New-ScheduledTaskRepetitionInterval -Interval (New-TimeSpan -Minutes 1) -Duration ([timespan]::MaxValue)
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Description "Task to create, verify and delete container with nginx check and log upload to Blob Storage."
 
-Write-Host "Scheduled task created to run daily at 2:00AM."
+Write-Host "Scheduled task created."
